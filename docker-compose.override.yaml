@@ -1,0 +1,13 @@
+### BEGIN COMMENT BLOCK ### - Uncomment to leave container running
+# services:
+#   legion:
+#     # Override the command to keep container running
+#     command: tail -f /dev/null
+#     # Add tty and stdin_open to make shell access work better
+#     tty: true
+#     stdin_open: true
+### END COMMENT BLOCK ###
+
+# To shell into the container, run:
+# docker compose up -d
+# docker compose exec legion bash
