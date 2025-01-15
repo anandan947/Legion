@@ -31,7 +31,7 @@ Welcome! We're excited you're interested in contributing to Legion. This documen
    - Install all dependencies
    - Set up pre-commit hooks
 
-   Note: Make sure you have Python 3.8+ installed before running the setup script.
+   Note: Make sure you have Python 3.11+ installed before running the setup script.
 
 3. **Create a Branch**
    ```bash

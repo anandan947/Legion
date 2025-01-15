@@ -1,11 +1,11 @@
 """Tests for the Groq provider implementation"""
 
-import asyncio
 import json
 import os
 from typing import List, Optional
 
 import pytest
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from legion.errors import ProviderError
@@ -13,6 +13,8 @@ from legion.interface.schemas import Message, ProviderConfig, Role
 from legion.interface.tools import BaseTool
 from legion.providers.groq import GroqFactory, GroqProvider
 
+# Load environment variables
+load_dotenv()
 
 class MockToolParams(BaseModel):
     """Parameters for mock tool"""

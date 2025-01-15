@@ -1,0 +1,9 @@
+services:
+  legion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    command: pytest -v
+    # command: poetry shell  # For interactive shell

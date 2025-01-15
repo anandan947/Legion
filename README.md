@@ -291,6 +291,49 @@ The `examples` directory contains several examples that demonstrate how to use L
 *   `examples/tools/basic_tools.py`: Shows how to create and use tools with an agent.
 *   `examples/tools/injected_tools.py`: Demonstrates parameter injection with tools.
 
+## Setting Up the Development Environment
+
+### Option 1: Using `Makefile`
+Optioned and automated
+- Requires you have `make` installed
+- `ENV` management options are currently `venv` or `conda`
+- `POETRY` can be set to `true` or `false` to use it or `pip`
+```bash
+make setup ENV=venv POETRY=false
+# or
+make setup ENV=conda POETRY=true
+# or
+make  # Just use the defaults
+```
+This will:
+- Create and activate a virtual environment (with specified `ENV`)
+- Install all dependencies (with `pip` or `poetry`)
+- Set up pre-commit hooks
+
+You can also:
+```bash
+make lint POETRY=<true|false>
+or
+make test POETRY=<true|false>
+```
+
+### Option 2: Using `setup.py`
+Default and standard `venv`/`pip` setup
+```bash
+# Run the setup script
+python3 scripts/setup_env.py
+
+# Activate the virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
+```
+This will:
+- Create and activate a virtual environment
+- Install all dependencies
+- Set up pre-commit hooks
+
 ## Documentation
 
 For more detailed information, please refer to the docstrings within the code itself.

@@ -5,13 +5,16 @@ import os
 from typing import List, Optional
 
 import pytest
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from legion.errors import ProviderError
-from legion.interface.schemas import ChatParameters, Message, ProviderConfig, Role, ModelResponse
+from legion.interface.schemas import ChatParameters, Message, ModelResponse, ProviderConfig, Role
 from legion.interface.tools import BaseTool
 from legion.providers.anthropic import AnthropicFactory, AnthropicProvider
 
+# Load environment variables
+load_dotenv()
 
 class MockToolParams(BaseModel):
     """Parameters for mock tool"""
@@ -111,14 +114,14 @@ def test_message_formatting(provider):
     # Basic messages use string content
     assert formatted[0]["content"] == "User message"
     assert formatted[1]["content"] == "Assistant message"
-    
+
     # Tool messages use structured content
     assert isinstance(formatted[2]["content"], list)
     assert formatted[2]["content"][0]["type"] == "tool_use"
     assert formatted[2]["content"][0]["id"] == "call_1"
     assert formatted[2]["content"][0]["name"] == "test_tool"
     assert formatted[2]["content"][0]["input"] == {"input": "test"}
-    
+
     assert isinstance(formatted[3]["content"], list)
     assert formatted[3]["content"][0]["type"] == "tool_result"
     assert formatted[3]["content"][0]["tool_use_id"] == "call_1"
@@ -140,19 +143,19 @@ def test_basic_completion(provider):
         model="claude-3-haiku-20240307",
         params=params
     )
-    
+
     # Test response structure
     assert isinstance(response, ModelResponse)
     assert isinstance(response.content, str)
     assert len(response.content) > 0
     assert response.tool_calls is None
-    
+
     # Test raw response
     assert isinstance(response.raw_response, dict)
     assert "content" in response.raw_response
     assert isinstance(response.raw_response["content"], list)
     assert response.raw_response["content"][0]["type"] == "text"
-    
+
     # Test usage
     assert response.usage is not None
     assert response.usage.prompt_tokens > 0
@@ -303,4 +306,4 @@ def test_invalid_api_key():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__]) 
+    pytest.main([__file__])
