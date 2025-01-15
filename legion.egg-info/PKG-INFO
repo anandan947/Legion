@@ -1,5 +1,6 @@
 Metadata-Version: 2.1
 Name: legion
 Version: 0.1.0
+License-File: LICENSE
 Requires-Dist: pydantic>=2.0.0
 Requires-Dist: openai>=1.0.0
