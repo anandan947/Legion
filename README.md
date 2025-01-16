@@ -297,7 +297,7 @@ The `examples` directory contains several examples that demonstrate how to use L
 Optioned and automated
 - Requires you have `make` installed
 - `ENV` management options are currently `venv` or `conda`
-- `POETRY` can be set to `true` or `false` to use it or `pip`
+- `POETRY` can be set to `true` or `false` to use it, or `pip`
 ```bash
 make setup ENV=venv POETRY=false
 # or
@@ -333,6 +333,20 @@ This will:
 - Create and activate a virtual environment
 - Install all dependencies
 - Set up pre-commit hooks
+
+### Option 3: 🐳 Whale you can just use `Docker`
+If you have Docker installed and the docker engine running, from the
+project root you can just run:
+```bash
+docker compose up --build
+```
+This will spin up a cointainer, build the project to it, and run the tests.
+Want to keep it running and get a shell on it to run other commands?
+```bash
+docker compose up -d  # detached
+docker compose exec legion bash
+```
+
 
 ## Documentation
 
