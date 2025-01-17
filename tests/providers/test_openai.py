@@ -40,8 +40,7 @@ class SimpleTool(BaseTool):
 @pytest.fixture
 def provider():
     config = ProviderConfig(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        organization_id=os.getenv("OPENAI_ORG_ID")
+        api_key=os.getenv("OPENAI_API_KEY", "test-key")
     )
     return OpenAIProvider(config=config)
 
@@ -55,17 +54,17 @@ def test_provider_initialization(provider):
 
 def test_factory_creation(factory):
     config = ProviderConfig(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        organization_id=os.getenv("OPENAI_ORG_ID")
+        api_key=os.getenv("OPENAI_API_KEY", "test-key")
     )
     provider = factory.create_provider(config=config)
     assert isinstance(provider, OpenAIProvider)
 
-def test_basic_completion(provider):
+@pytest.mark.asyncio
+async def test_basic_completion(provider):
     messages = [
         Message(role=Role.USER, content="Say 'Hello, World!'")
     ]
-    response = provider.complete(
+    response = await provider.complete(
         messages=messages,
         model="gpt-4o-mini",
         temperature=0
@@ -76,13 +75,14 @@ def test_basic_completion(provider):
     assert response.usage is not None
     assert response.tool_calls is None
 
-def test_tool_completion(provider):
+@pytest.mark.asyncio
+async def test_tool_completion(provider):
     tool = SimpleTool()
     messages = [
         Message(role=Role.SYSTEM, content="You are a helpful assistant that uses tools when appropriate."),
         Message(role=Role.USER, content="Use the simple tool to say hello")
     ]
-    response = provider.complete(
+    response = await provider.complete(
         messages=messages,
         model="gpt-4o-mini",
         tools=[tool],
@@ -93,14 +93,15 @@ def test_tool_completion(provider):
     assert len(response.tool_calls) > 0
     assert response.tool_calls[0]["function"]["name"] == "simple_tool"
 
-def test_json_completion(provider):
+@pytest.mark.asyncio
+async def test_json_completion(provider):
     messages = [
         Message(
             role=Role.USER,
             content="Give me information about a person named John who is 25 and likes reading and gaming"
         )
     ]
-    response = provider.complete(
+    response = await provider.complete(
         messages=messages,
         model="gpt-4o-mini",
         temperature=0,
@@ -112,13 +113,14 @@ def test_json_completion(provider):
     assert isinstance(data.age, int)
     assert isinstance(data.hobbies, list)
 
-def test_tool_and_json_completion(provider):
+@pytest.mark.asyncio
+async def test_tool_and_json_completion(provider):
     tool = SimpleTool()
     messages = [
         Message(role=Role.SYSTEM, content="You are a helpful assistant that uses tools and returns structured data."),
         Message(role=Role.USER, content="Use the simple tool to say hello, then format the response as a person's info")
     ]
-    response = provider.complete(
+    response = await provider.complete(
         messages=messages,
         model="gpt-4o-mini",
         tools=[tool],
@@ -150,32 +152,35 @@ async def test_async_completion(provider):
     assert isinstance(response.content, str)
     assert len(response.content) > 0
 
-def test_invalid_api_key():
+@pytest.mark.asyncio
+async def test_invalid_api_key():
     config = ProviderConfig(api_key="invalid_key")
     provider = OpenAIProvider(config=config)
     messages = [Message(role=Role.USER, content="test")]
 
     with pytest.raises(ProviderError):
-        provider.complete(
+        await provider.complete(
             messages=messages,
             model="gpt-4o-mini"
         )
 
-def test_invalid_model(provider):
+@pytest.mark.asyncio
+async def test_invalid_model(provider):
     messages = [Message(role=Role.USER, content="test")]
 
     with pytest.raises(ProviderError):
-        provider.complete(
+        await provider.complete(
             messages=messages,
             model="invalid-model"
         )
 
-def test_system_message_handling(provider):
+@pytest.mark.asyncio
+async def test_system_message_handling(provider):
     messages = [
         Message(role=Role.SYSTEM, content="You are a helpful assistant"),
         Message(role=Role.USER, content="Who are you?")
     ]
-    response = provider.complete(
+    response = await provider.complete(
         messages=messages,
         model="gpt-4o-mini",
         temperature=0
