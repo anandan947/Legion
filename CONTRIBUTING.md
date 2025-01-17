@@ -33,7 +33,15 @@ Welcome! We're excited you're interested in contributing to Legion. This documen
 
    Note: Make sure you have Python 3.8+ installed before running the setup script.
 
-3. **Create a Branch**
+3. **Configure Git Email**
+   To maintain privacy while contributing, you can use a GitHub-provided no-reply email address:
+   ```bash
+   # Replace 'username' with your GitHub username
+   # Get your GitHub user ID from: https://api.github.com/users/username
+   git config user.email "ID+username@users.noreply.github.com"
+   ```
+
+4. **Create a Branch**
    ```bash
    git checkout -b feature/your-feature-name
    # or
@@ -135,6 +143,31 @@ python scripts/security.py legion/agents legion/blocks
    - Maintainers will review your PR
    - Address any requested changes
    - Once approved, maintainers will merge your PR
+
+### **Collaboration Patterns**
+
+1. **Direct to Upstream** (Recommended)
+   - Each contributor maintains their fork
+   - Create PRs directly to upstream
+   - Sync fork:
+     ```bash
+     git fetch upstream
+     git rebase upstream/main
+     ```
+
+2. **Fork Collaboration**
+   - Add collaborators to your fork's settings
+   - Both can push branches
+   - Create single PR to upstream
+   - Maintain clear ownership of the PR
+
+3. **Cross-fork PRs**
+   - For non-collaborator contributions
+   - Create PR between forks
+   - Owner submits final PR upstream
+
+Note: Contributions are tracked through PRs, not individual commits due to squash merging. All contributors are credited in the PR history.
+
 
 ## Issue Guidelines
 
