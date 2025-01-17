@@ -3,8 +3,6 @@
 import asyncio
 import json
 import os
-import re
-import uuid
 from typing import Any, Dict, List, Optional, Sequence, Type
 
 from openai import OpenAI
@@ -104,29 +102,13 @@ class GroqProvider(LLMInterface):
 
         return formatted_messages
 
-    def _format_tool(self, tool: BaseTool) -> Dict[str, Any]:
-        """Format a tool for Groq API"""
-        schema = tool.parameters.model_json_schema()
-        # Remove title and definitions from schema as they're not needed
-        schema.pop("title", None)
-        schema.pop("definitions", None)
-        
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": schema
-            }
-        }
-
-    def _extract_tool_calls(self, response) -> Optional[List[Dict[str, Any]]]:
-        """Extract tool calls from response"""
+    def _extract_tool_calls(self, response: Any) -> Optional[List[Dict[str, Any]]]:
+        """Extract tool calls from Groq response"""
         if not hasattr(response.choices[0].message, "tool_calls"):
             return None
         if not response.choices[0].message.tool_calls:
             return None
-        
+
         tool_calls = []
         for tool_call in response.choices[0].message.tool_calls:
             call_data = {
@@ -138,7 +120,7 @@ class GroqProvider(LLMInterface):
                 }
             }
             tool_calls.append(call_data)
-            
+
         return tool_calls
 
     def _extract_content(self, response: Any) -> str:
@@ -155,10 +137,39 @@ class GroqProvider(LLMInterface):
         )
 
     def _response_to_dict(self, response: Any) -> Dict[str, Any]:
-        """Convert response to dictionary format"""
-        if hasattr(response, "model_dump"):
-            return response.model_dump()
-        return {"content": str(response)}
+        """Convert OpenAI response to dictionary"""
+        return {
+            "id": response.id,
+            "object": response.object,
+            "created": response.created,
+            "model": response.model,
+            "choices": [
+                {
+                    "index": choice.index,
+                    "message": {
+                        "role": choice.message.role,
+                        "content": choice.message.content,
+                        "tool_calls": [
+                            {
+                                "id": tool_call.id,
+                                "type": tool_call.type,
+                                "function": {
+                                    "name": tool_call.function.name,
+                                    "arguments": tool_call.function.arguments
+                                }
+                            }
+                            for tool_call in (choice.message.tool_calls or [])
+                        ] if choice.message.tool_calls else None
+                    }
+                }
+                for choice in response.choices
+            ],
+            "usage": {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
+        }
 
     def _validate_request(self, **kwargs) -> dict:
         """Validate and modify request parameters for Groq"""
@@ -241,114 +252,83 @@ class GroqProvider(LLMInterface):
     ) -> ModelResponse:
         """Get completion with tool usage asynchronously"""
         try:
+            # Initialize conversation
             current_messages = messages.copy()
-            final_tool_calls = []
-
-            # Add tool use instructions
-            tool_instructions = (
-                "You have access to tools that you can use. When using a tool, format your response as a tool call. "
-                "Do not include any text before making tool calls. Make sequential tool calls until you have all "
-                "the information needed, then provide your final response."
-            )
-
-            # If JSON formatting is requested, add JSON instructions
-            if format_json and json_schema:
-                schema_json = json_schema.model_json_schema()
-                json_instructions = (
-                    "\n\nAfter using tools, format your final response as JSON matching this schema:\n"
-                    f"{json.dumps(schema_json, indent=2)}\n\n"
-                    "Respond ONLY with valid JSON matching this schema. No other text."
-                )
-                tool_instructions = tool_instructions + json_instructions
-
-            # Add or update system message
-            system_msg_index = next(
-                (i for i, msg in enumerate(current_messages) if msg.role == Role.SYSTEM),
-                None
-            )
-            if system_msg_index is not None:
-                current_messages[system_msg_index].content += f"\n\n{tool_instructions}"
-            else:
-                current_messages.insert(0, Message(role=Role.SYSTEM, content=tool_instructions))
 
             while True:
-                # Format messages for Groq
-                formatted_messages = self._format_messages(current_messages)
+                if self.debug:
+                    print(f"\nSending request to Groq with {len(current_messages)} messages...")
+
                 kwargs = self._validate_request(
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
 
-                # Format tools for Groq
-                formatted_tools = [self._format_tool(tool) for tool in tools]
-
-                # Create request
+                # Get response with tools
                 response = self.client.chat.completions.create(
-                    model="llama-3.1-8b-instant",  # Use the specified model
-                    messages=formatted_messages,
-                    tools=formatted_tools,
+                    model=model,
+                    messages=self._format_messages(current_messages),
+                    tools=[tool.get_schema() for tool in tools if tool.parameters],
                     tool_choice="auto",
                     **kwargs
                 )
 
-                content = self._extract_content(response)
+                # Get assistant's message and tool calls
+                assistant_message = response.choices[0].message
+                content = assistant_message.content or ""  # Ensure content is never None
                 tool_calls = self._extract_tool_calls(response)
 
-                # If no tool calls, we're done
-                if not tool_calls:
-                    # If JSON formatting requested, format the final response
-                    if format_json and json_schema:
-                        json_messages = self._create_json_conversation(current_messages, json_schema)
-                        json_response = await self._aget_json_completion(
-                            messages=json_messages,
-                            model=model,
-                            schema=json_schema,
-                            temperature=0.0,
-                            max_tokens=max_tokens
-                        )
-                        # Preserve tool calls in the JSON response
-                        return ModelResponse(
-                            content=json_response.content,
-                            raw_response=json_response.raw_response,
-                            usage=json_response.usage,
-                            tool_calls=final_tool_calls
-                        )
+                if self.debug:
+                    if tool_calls:
+                        print("\nGroq tool calls triggered:")
+                        for call in tool_calls:
+                            print(f"- {call['function']['name']}: {call['function']['arguments']}")
+                    else:
+                        print("\nNo tool calls in Groq response")
 
-                    return ModelResponse(
-                        content=content,
-                        raw_response=self._response_to_dict(response),
-                        tool_calls=final_tool_calls if final_tool_calls else None,
-                        usage=self._extract_usage(response)
-                    )
-
-                # Add assistant's response with tool calls
-                current_messages.append(Message(
+                # Add assistant's response to conversation
+                assistant_msg = Message(
                     role=Role.ASSISTANT,
                     content=content,
                     tool_calls=tool_calls
-                ))
+                )
+                current_messages.append(assistant_msg)
 
-                # Store tool calls for final response
-                final_tool_calls.extend(tool_calls)
+                # If no tool calls, this is our final response
+                if not tool_calls:
+                    if self.debug:
+                        print("\nFinal response received from Groq")
+                    return ModelResponse(
+                        content=content,
+                        raw_response=self._response_to_dict(response),
+                        usage=self._extract_usage(response),
+                        tool_calls=None
+                    )
 
-                # Process each tool call
+                # Process tool calls
                 for tool_call in tool_calls:
                     tool = next(
                         (t for t in tools if t.name == tool_call["function"]["name"]),
                         None
                     )
-
                     if tool:
-                        args = json.loads(tool_call["function"]["arguments"])
-                        result = await tool.arun(**args)  # Use async tool call
+                        try:
+                            args = json.loads(tool_call["function"]["arguments"])
+                            result = await tool(**args) if asyncio.iscoroutinefunction(tool) else tool(**args)
 
-                        # Add tool response to conversation
-                        current_messages.append(Message(
-                            role=Role.TOOL,  # Use Role.TOOL for OpenAI compatibility
-                            content=str(result),
-                            tool_call_id=tool_call["id"],
-                            name=tool_call["function"]["name"]
-                        ))
+                            if self.debug:
+                                print(f"\nTool {tool.name} returned: {result}")
+
+                            # Add tool response to conversation
+                            tool_msg = Message(
+                                role=Role.TOOL,
+                                content=str(result),
+                                tool_call_id=tool_call["id"],
+                                name=tool_call["function"]["name"]
+                            )
+                            current_messages.append(tool_msg)
+                        except Exception as e:
+                            raise ProviderError(f"Error executing {tool.name}: {str(e)}")
 
         except Exception as e:
             raise ProviderError(f"Groq tool completion failed: {str(e)}")
@@ -362,61 +342,36 @@ class GroqProvider(LLMInterface):
         max_tokens: Optional[int] = None
     ) -> ModelResponse:
         """Get a chat completion formatted as JSON"""
-        return asyncio.get_event_loop().run_until_complete(
-            self._aget_json_completion(
-                messages=messages,
-                model=model,
-                schema=schema,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-        )
-
-    async def _aget_json_completion(
-        self,
-        messages: List[Message],
-        model: str,
-        schema: Type[BaseModel],
-        temperature: float,
-        max_tokens: Optional[int] = None
-    ) -> ModelResponse:
-        """Get a chat completion formatted as JSON asynchronously"""
         try:
-            # Add JSON formatting instructions
-            json_instructions = (
-                "Format your response as JSON matching this schema:\n"
-                f"{json.dumps(schema.model_json_schema(), indent=2)}\n\n"
-                "Respond ONLY with valid JSON matching this schema. No other text."
-            )
+            # Get generic JSON formatting prompt
+            formatting_prompt = self._get_json_formatting_prompt(schema, messages[-1].content)
 
-            # Add or update system message
-            current_messages = messages.copy()
-            system_msg_index = next(
-                (i for i, msg in enumerate(current_messages) if msg.role == Role.SYSTEM),
-                None
-            )
-            if system_msg_index is not None:
-                current_messages[system_msg_index].content += f"\n\n{json_instructions}"
-            else:
-                current_messages.insert(0, Message(role=Role.SYSTEM, content=json_instructions))
+            # Create messages for Groq
+            groq_messages = [
+                {"role": "system", "content": formatting_prompt}
+            ]
 
-            # Format messages for Groq
-            formatted_messages = self._format_messages(current_messages)
+            # Add remaining messages, skipping system and only including required fields
+            groq_messages.extend([
+                {"role": msg.role.value, "content": msg.content}
+                for msg in messages
+                if msg.role != Role.SYSTEM
+            ])
+
             kwargs = self._validate_request(
                 temperature=temperature,
                 max_tokens=max_tokens
             )
 
-            # Create request
             response = self.client.chat.completions.create(
                 model=model,
-                messages=formatted_messages,
+                messages=groq_messages,
                 response_format={"type": "json_object"},
                 **kwargs
             )
 
-            # Extract and validate content
-            content = self._extract_content(response)
+            # Validate response against schema
+            content = response.choices[0].message.content
             try:
                 data = json.loads(content)
                 schema.model_validate(data)
@@ -429,7 +384,6 @@ class GroqProvider(LLMInterface):
                 usage=self._extract_usage(response),
                 tool_calls=None
             )
-
         except Exception as e:
             raise ProviderError(f"Groq JSON completion failed: {str(e)}")
 
@@ -445,6 +399,24 @@ class GroqProvider(LLMInterface):
         return self._get_chat_completion(
             messages=messages,
             model=model,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
+    async def _aget_json_completion(
+        self,
+        messages: List[Message],
+        model: str,
+        schema: Type[BaseModel],
+        temperature: float,
+        max_tokens: Optional[int] = None
+    ) -> ModelResponse:
+        """Get a chat completion formatted as JSON asynchronously"""
+        # For now, just use sync version since Groq uses OpenAI's client
+        return self._get_json_completion(
+            messages=messages,
+            model=model,
+            schema=schema,
             temperature=temperature,
             max_tokens=max_tokens
         )

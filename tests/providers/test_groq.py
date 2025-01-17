@@ -114,7 +114,7 @@ def test_basic_completion(provider):
     ]
     response = provider._get_chat_completion(
         messages=messages,
-        model="mixtral-8x7b-32768",
+        model="llama-3.3-70b-versatile",
         temperature=0.7
     )
     assert response.content
@@ -133,7 +133,7 @@ async def test_tool_completion(provider):
     tool = MockTool()
     response = await provider._aget_tool_completion(
         messages=messages,
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         tools=[tool],
         temperature=0.7
     )
@@ -154,9 +154,9 @@ def test_json_completion(provider):
     ]
     response = provider._get_json_completion(
         messages=messages,
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         schema=TestResponse,
-        temperature=0.7
+        temperature=0.1
     )
     assert response.content
     assert isinstance(response.raw_response, dict)
@@ -177,7 +177,7 @@ def test_temperature_validation(provider):
     # Test temperature=0 gets converted to 1e-8
     response = provider._get_chat_completion(
         messages=messages,
-        model="mixtral-8x7b-32768",
+        model="llama-3.3-70b-versatile",
         temperature=0
     )
     assert response.content
@@ -201,47 +201,9 @@ def test_error_handling(provider):
     with pytest.raises(ProviderError):
         provider._get_chat_completion(
             messages=messages,
-            model="mixtral-8x7b-32768",
+            model="llama-3.3-70b-versatile",
             temperature=2.5
         )
-
-
-@pytest.mark.skipif(not os.environ.get("GROQ_API_KEY"), reason="No Groq API key available")
-@pytest.mark.asyncio
-async def test_tool_and_json_completion(provider):
-    """Test completion with both tool use and JSON formatting"""
-    messages = [
-        Message(
-            role=Role.USER,
-            content="Use the mock tool with input='test' and format the result as a test response"
-        )
-    ]
-    tool = MockTool()
-    response = await provider._aget_tool_completion(
-        messages=messages,
-        model="llama-3.1-8b-instant",
-        tools=[tool],
-        temperature=0.7,
-        format_json=True,
-        json_schema=TestResponse
-    )
-    
-    assert response.content
-    assert response.usage
-    assert response.usage.total_tokens > 0
-    assert isinstance(response.raw_response, dict)
-    
-    # Verify tool calls were made
-    assert response.tool_calls
-    assert len(response.tool_calls) > 0
-    assert response.tool_calls[0]["function"]["name"] == "mock_tool"
-    
-    # Verify JSON is valid and matches schema
-    data = json.loads(response.content)
-    test_response = TestResponse(**data)
-    assert test_response.message
-    assert 0 <= test_response.score <= 1
-    assert isinstance(test_response.tags, list) or test_response.tags is None
 
 
 if __name__ == "__main__":

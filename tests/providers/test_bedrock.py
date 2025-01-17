@@ -82,7 +82,6 @@ async def test_basic_completion(provider):
 
 @pytest.mark.asyncio
 async def test_tool_completion(provider):
-    provider.debug = True  # Enable debug logging
     tool = SimpleTool()
     messages = [
         Message(role=Role.SYSTEM, content="You are a helpful assistant that uses tools when appropriate."),
@@ -101,10 +100,8 @@ async def test_tool_completion(provider):
     assert len(response.content) > 0
     assert response.tool_calls is not None
     assert len(response.tool_calls) > 0
-    assert any(
-        call["function"]["name"] == "simple_tool" 
-        for call in response.tool_calls
-    )
+    assert response.tool_calls[0]["function"]["name"] == "simple_tool"
+    assert "hello world" in response.tool_calls[0]["function"]["arguments"].lower()
 
 @pytest.mark.asyncio
 async def test_json_completion(provider):

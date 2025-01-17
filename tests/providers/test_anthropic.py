@@ -164,14 +164,13 @@ def test_basic_completion(provider):
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="No Anthropic API key available")
-@pytest.mark.asyncio
-async def test_tool_completion(provider):
+def test_tool_completion(provider):
     """Test completion with tool use"""
     tool = MockTool()
     messages = [
         Message(role=Role.USER, content="Use the mock tool with input='test'")
     ]
-    response = await provider.complete(
+    response = provider.complete(
         messages=messages,
         model="claude-3-haiku-20240307",
         tools=[tool],
@@ -188,8 +187,7 @@ async def test_tool_completion(provider):
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="No Anthropic API key available")
-@pytest.mark.asyncio
-async def test_json_completion(provider):
+def test_json_completion(provider):
     """Test JSON completion"""
     messages = [
         Message(
@@ -197,7 +195,7 @@ async def test_json_completion(provider):
             content="Generate a test response with message='Hello', score=0.9, tags=['test']"
         )
     ]
-    response = await provider.complete(
+    response = provider.complete(
         messages=messages,
         model="claude-3-haiku-20240307",
         temperature=0.1,
@@ -215,15 +213,14 @@ async def test_json_completion(provider):
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="No Anthropic API key available")
-@pytest.mark.asyncio
-async def test_tool_and_json_completion(provider):
+def test_tool_and_json_completion(provider):
     """Test combining tool use with JSON response formatting"""
     tool = MockTool()
     messages = [
         Message(role=Role.SYSTEM, content="You are a helpful assistant that uses tools and returns structured data."),
         Message(role=Role.USER, content="Use the mock tool with input='test', then format the response as a test response")
     ]
-    response = await provider.complete(
+    response = provider.complete(
         messages=messages,
         model="claude-3-haiku-20240307",
         tools=[tool],
@@ -266,14 +263,13 @@ async def test_async_completion(provider):
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="No Anthropic API key available")
-@pytest.mark.asyncio
-async def test_system_message_handling(provider):
+def test_system_message_handling(provider):
     """Test system message handling"""
     messages = [
         Message(role=Role.SYSTEM, content="You are Claude, a helpful AI assistant created by Anthropic."),
         Message(role=Role.USER, content="Who are you?")
     ]
-    response = await provider.complete(
+    response = provider.complete(
         messages=messages,
         model="claude-3-haiku-20240307",
         temperature=0
@@ -285,28 +281,24 @@ async def test_system_message_handling(provider):
     assert any(word in response.content.lower() for word in ["claude", "anthropic", "assist"])
 
 
-@pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="No Anthropic API key available")
-@pytest.mark.asyncio
-async def test_invalid_model(provider):
+def test_invalid_model(provider):
     """Test error handling for invalid model"""
     messages = [Message(role=Role.USER, content="Test")]
     with pytest.raises(ProviderError):
-        await provider.complete(
+        provider.complete(
             messages=messages,
             model="invalid-model",
             temperature=0.7
         )
 
 
-@pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="No Anthropic API key available")
-@pytest.mark.asyncio
-async def test_invalid_api_key():
+def test_invalid_api_key():
     """Test error handling for invalid API key"""
     config = ProviderConfig(api_key="invalid_key")
     provider = AnthropicProvider(config=config)
     messages = [Message(role=Role.USER, content="Test")]
     with pytest.raises(ProviderError):
-        await provider.complete(
+        provider.complete(
             messages=messages,
             model="claude-3-haiku-20240307",
             temperature=0.7

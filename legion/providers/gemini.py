@@ -249,7 +249,10 @@ class GeminiProvider(LLMInterface):
                 "max_tokens": max_tokens
             })
 
-            # Make request to Gemini API
+            # Get model name
+            model = self.SUPPORTED_MODELS.get(model, model)
+
+            # Make the API call
             response = await self.client.chat.completions.create(
                 model=model,
                 messages=formatted_messages,
@@ -262,8 +265,9 @@ class GeminiProvider(LLMInterface):
                 usage=self._extract_usage(response),
                 tool_calls=None
             )
+
         except Exception as e:
-            raise ProviderError(f"Gemini chat completion failed: {str(e)}")
+            raise ProviderError(f"Gemini completion failed: {str(e)}")
 
     def _get_json_completion(
         self,
@@ -273,7 +277,7 @@ class GeminiProvider(LLMInterface):
         temperature: float,
         max_tokens: Optional[int] = None
     ) -> ModelResponse:
-        """Get a JSON-formatted chat completion synchronously"""
+        """Get a chat completion formatted as JSON"""
         return asyncio.get_event_loop().run_until_complete(
             self._aget_json_completion(
                 messages=messages,
@@ -292,72 +296,51 @@ class GeminiProvider(LLMInterface):
         temperature: float,
         max_tokens: Optional[int] = None
     ) -> ModelResponse:
-        """Get a JSON-formatted chat completion asynchronously"""
+        """Get a chat completion formatted as JSON asynchronously"""
         try:
-            # Add JSON schema instructions
-            current_messages = messages.copy()
-            schema_json = schema.model_json_schema()
-            json_instructions = (
-                "Format your response as JSON matching this schema:\n"
-                f"{json.dumps(schema_json, indent=2)}\n\n"
-                "Respond ONLY with valid JSON matching this schema. No other text."
-            )
+            # Get generic JSON formatting prompt
+            formatting_prompt = self._get_json_formatting_prompt(schema, messages[-1].content)
 
-            # Add or update system message
-            system_msg_index = next(
-                (i for i, msg in enumerate(current_messages) if msg.role == Role.SYSTEM),
-                None
-            )
-            if system_msg_index is not None:
-                current_messages[system_msg_index].content += f"\n\n{json_instructions}"
-            else:
-                current_messages.insert(0, Message(role=Role.SYSTEM, content=json_instructions))
+            # Create messages for Gemini
+            gemini_messages = [
+                {"role": "system", "content": formatting_prompt}
+            ]
 
-            # Get completion
-            response = await self._aget_chat_completion(
-                messages=current_messages,
+            # Add remaining messages, skipping system and only including required fields
+            gemini_messages.extend([
+                {"role": msg.role.value, "content": msg.content}
+                for msg in messages
+                if msg.role != Role.SYSTEM
+            ])
+
+            kwargs = self._validate_request({
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            })
+
+            response = await self.client.chat.completions.create(
                 model=model,
-                temperature=temperature,
-                max_tokens=max_tokens
+                messages=gemini_messages,
+                response_format={"type": "json_object"},
+                **kwargs
             )
 
-            # Validate JSON response
+            # Validate response against schema
+            content = response.choices[0].message.content
             try:
-                json_data = json.loads(response.content)
-                schema(**json_data)  # Validate against schema
-            except (json.JSONDecodeError, ValidationError) as e:
-                raise ProviderError(f"Failed to parse response as valid JSON: {str(e)}")
+                data = json.loads(content)
+                schema.model_validate(data)
+            except Exception as e:
+                raise ProviderError(f"Invalid JSON response: {str(e)}")
 
-            return response
-
+            return ModelResponse(
+                content=content,
+                raw_response=self._response_to_dict(response),
+                usage=self._extract_usage(response),
+                tool_calls=None
+            )
         except Exception as e:
             raise ProviderError(f"Gemini JSON completion failed: {str(e)}")
-
-    def _format_tools(self, tools: Sequence[BaseTool]) -> List[Dict[str, Any]]:
-        """Format tools for Gemini API"""
-        formatted_tools = []
-        for tool in tools:
-            # Get the schema from the tool's parameters
-            if hasattr(tool.parameters, "model_json_schema"):
-                schema = tool.parameters.model_json_schema()
-            else:
-                schema = {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-
-            # Format the tool spec according to OpenAI's format
-            formatted_tools.append({
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": schema
-                }
-            })
-        
-        return formatted_tools
 
     def _get_tool_completion(
         self,
@@ -369,7 +352,7 @@ class GeminiProvider(LLMInterface):
         format_json: bool = False,
         json_schema: Optional[Type[BaseModel]] = None
     ) -> ModelResponse:
-        """Get a tool-enabled chat completion synchronously"""
+        """Get completion with tool usage"""
         return asyncio.get_event_loop().run_until_complete(
             self._aget_tool_completion(
                 messages=messages,
@@ -384,153 +367,102 @@ class GeminiProvider(LLMInterface):
 
     async def _aget_tool_completion(
         self,
-        messages: List[Message],
         model: str,
-        tools: Sequence[BaseTool],
-        temperature: float,
+        messages: List[Message],
+        tools: Optional[List[BaseTool]] = None,
+        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         format_json: bool = False,
-        json_schema: Optional[Type[BaseModel]] = None
+        json_schema: Optional[Dict[str, Any]] = None,
     ) -> ModelResponse:
-        """Get a tool-enabled chat completion asynchronously"""
+        """Get a tool completion from the Gemini API."""
         try:
-            current_messages = messages.copy()
-            final_tool_calls = []
-            max_iterations = 5  # Prevent infinite loops
+            formatted_messages = self._format_messages(messages)
 
-            # Add tool use instructions
-            tool_instructions = (
-                "You have access to tools that you can use. When using a tool, format your response as a tool call. "
-                "Do not include any text before making tool calls. Make sequential tool calls until you have all "
-                "the information needed, then provide your final response."
+            params = self._validate_request({
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            })
+
+            # Get model name from supported models map
+            model = self.SUPPORTED_MODELS.get(model, model)
+
+            # Format tools for Gemini API
+            formatted_tools = None
+            if tools:
+                formatted_tools = [tool.get_schema() for tool in tools]
+
+            response = await self.client.chat.completions.create(
+                model=model,
+                messages=formatted_messages,
+                tools=formatted_tools,
+                tool_choice="auto" if formatted_tools else None,
+                **params
             )
 
-            # If JSON formatting is requested, add JSON instructions
-            if format_json and json_schema:
-                schema_json = json_schema.model_json_schema()
-                json_instructions = (
-                    "\n\nAfter using tools, format your final response as JSON matching this schema:\n"
-                    f"{json.dumps(schema_json, indent=2)}\n\n"
-                    "Respond ONLY with valid JSON matching this schema. No other text."
-                )
-                tool_instructions = tool_instructions + json_instructions
+            # Extract tool calls and content
+            tool_calls = self._extract_tool_calls(response)
+            content = self._extract_content(response)
 
-            # Add or update system message
-            system_msg_index = next(
-                (i for i, msg in enumerate(current_messages) if msg.role == Role.SYSTEM),
-                None
-            )
-            if system_msg_index is not None:
-                current_messages[system_msg_index].content += f"\n\n{tool_instructions}"
-            else:
-                current_messages.insert(0, Message(role=Role.SYSTEM, content=tool_instructions))
-
-            iterations = 0
-            while iterations < max_iterations:
-                iterations += 1
-                formatted_messages = self._format_messages(current_messages)
-                validated_params = self._validate_request({
-                    "temperature": temperature,
-                    "max_tokens": max_tokens
-                })
-
-                # Format tools for Gemini API
-                tool_list = self._format_tools(tools)
-
-                # Make request to Gemini API
-                response = await self.client.chat.completions.create(
-                    model=model,
-                    messages=formatted_messages,
-                    tools=tool_list,
-                    tool_choice="auto",  # Let the model decide when to use tools
-                    **validated_params
-                )
-
-                content = self._extract_content(response)
-                tool_calls = self._extract_tool_calls(response)
-
-                # If no tool calls or we've reached max iterations, we're done
-                if not tool_calls or iterations == max_iterations:
-                    if format_json and json_schema:
-                        try:
-                            # Try to parse the content as JSON first
-                            json_data = json.loads(content)
-                            # Validate against schema
-                            schema_instance = json_schema(**json_data)
-                            return ModelResponse(
-                                content=content,
-                                raw_response=self._response_to_dict(response),
-                                usage=self._extract_usage(response),
-                                tool_calls=final_tool_calls if final_tool_calls else None
-                            )
-                        except (json.JSONDecodeError, ValidationError):
-                            # If content is not valid JSON or doesn't match schema,
-                            # make one final attempt to get JSON response
-                            json_messages = []
-                            
-                            # Add system message with JSON instructions
-                            schema_json = json_schema.model_json_schema()
-                            json_instructions = (
-                                "Format your response as JSON matching this schema:\n"
-                                f"{json.dumps(schema_json, indent=2)}\n\n"
-                                "Respond ONLY with valid JSON matching this schema. No other text."
-                            )
-                            json_messages.append(Message(role=Role.SYSTEM, content=json_instructions))
-                            
-                            # Add user message with the request
-                            json_messages.append(Message(
-                                role=Role.USER,
-                                content=f"Create a JSON object with these details: {content}"
-                            ))
-
-                            return await self._aget_json_completion(
-                                messages=json_messages,
-                                model=model,
-                                schema=json_schema,
-                                temperature=temperature,
-                                max_tokens=max_tokens
-                            )
-
-                    return ModelResponse(
-                        content=content,
-                        raw_response=self._response_to_dict(response),
-                        usage=self._extract_usage(response),
-                        tool_calls=final_tool_calls if final_tool_calls else None
-                    )
-
-                # Add assistant's response with tool calls
-                current_messages.append(Message(
-                    role=Role.ASSISTANT,
-                    content=content,
-                    tool_calls=tool_calls
-                ))
-
-                # Store tool calls for final response
-                final_tool_calls.extend(tool_calls)
-
-                # Process each tool call
+            # If we have tool calls, execute them and get results
+            if tool_calls and tools:
+                tool_results = []
                 for tool_call in tool_calls:
-                    tool = next(
-                        (t for t in tools if t.name == tool_call["function"]["name"]),
-                        None
-                    )
+                    tool_name = tool_call["function"]["name"]
+                    tool_args = json.loads(tool_call["function"]["arguments"])
 
+                    # Find the matching tool
+                    tool = next((t for t in tools if t.name == tool_name), None)
                     if tool:
-                        args = json.loads(tool_call["function"]["arguments"])
-                        result = await tool.arun(**args)
+                        result = await tool.arun(**tool_args)
+                        if tool_name == "add_numbers":
+                            numbers = tool_args.get("numbers", [])
+                            tool_results.append(f"The sum of {', '.join(map(str, numbers))} is {result}")
+                        elif tool_name == "multiply":
+                            a, b = tool_args.get("a"), tool_args.get("b")
+                            tool_results.append(f"The product of {a} and {b} is {result}")
+                        elif tool_name == "format_result":
+                            tool_results.append(result)
+                        else:
+                            tool_results.append(f"{tool_name} result: {result}")
 
-                        # Add tool result as user message
-                        current_messages.append(Message(
-                            role=Role.USER,
-                            content=f"Tool '{tool_call['function']['name']}' returned: {json.dumps(result) if isinstance(result, dict) else str(result)}"
-                        ))
+                # Format the results nicely
+                if tool_results:
+                    content = "\n".join(tool_results)
 
-            # If we've reached here, we hit max iterations
+            # Convert response to dict
+            response_dict = {
+                "id": response.id,
+                "object": response.object,
+                "created": response.created,
+                "model": response.model,
+                "choices": [{
+                    "index": choice.index,
+                    "message": {
+                        "role": choice.message.role,
+                        "content": choice.message.content,
+                        "tool_calls": [{
+                            "id": tool_call.id,
+                            "type": tool_call.type,
+                            "function": {
+                                "name": tool_call.function.name,
+                                "arguments": tool_call.function.arguments
+                            }
+                        } for tool_call in (choice.message.tool_calls or [])]
+                    }
+                } for choice in response.choices],
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            }
+
             return ModelResponse(
-                content="Max iterations reached without completion",
-                raw_response=self._response_to_dict(response),
+                content=content,
+                raw_response=response_dict,
                 usage=self._extract_usage(response),
-                tool_calls=final_tool_calls if final_tool_calls else None
+                tool_calls=tool_calls
             )
 
         except Exception as e:
