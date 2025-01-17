@@ -131,10 +131,14 @@ class TestGeminiProvider:
             type="function",
             function=function_mock
         )
-        first_response = MockResponse("Tool result: value", [tool_call])
-
-        # Set up response
-        provider.client.chat.completions.create.return_value = first_response
+        first_response = MockResponse("", [tool_call])  # Empty content since using tool
+        final_response = MockResponse("Final response after tool use")  # Response after tool use
+        
+        # Set up responses sequence
+        provider.client.chat.completions.create.side_effect = [
+            first_response,  # First call returns tool call
+            final_response  # Second call returns final response
+        ]
 
         # Create test tool
         class TestParameters(BaseModel):
@@ -151,7 +155,12 @@ class TestGeminiProvider:
                 )
 
             def run(self, arg: str) -> str:
+                """Implement the sync run method"""
                 return f"Tool result: {arg}"
+
+            async def arun(self, arg: str) -> str:
+                """Implement the async run method"""
+                return self.run(arg)  # Reuse sync implementation
 
         messages = [Message(role=Role.USER, content="Use the tool")]
         tools = [TestTool()]
@@ -163,9 +172,10 @@ class TestGeminiProvider:
             temperature=0.7
         )
 
-        assert response.content == "test_tool result: Tool result: value"
+        assert response.content == "Final response after tool use"
         assert response.usage.total_tokens == 30
         assert response.tool_calls is not None
+        assert len(response.tool_calls) == 1
         assert response.tool_calls[0]["function"]["name"] == "test_tool"
 
     @pytest.mark.asyncio
@@ -220,6 +230,86 @@ class TestGeminiProvider:
         assert "presence_penalty" not in kwargs
         assert "top_logprobs" not in kwargs
         assert kwargs["temperature"] == 0.5
+
+    @pytest.mark.asyncio
+    async def test_tool_and_json_completion(self, provider):
+        """Test combined tool usage and JSON formatting"""
+        # Define test schema
+        class TestSchema(BaseModel):
+            name: str
+            age: int
+            hobbies: List[str]
+
+        # First response with tool call
+        function_mock = MagicMock()
+        function_mock.name = "test_tool"
+        function_mock.arguments = '{"arg": "hello world"}'
+        
+        tool_call = MagicMock(
+            id="call-123",
+            type="function",
+            function=function_mock
+        )
+
+        # Set up response sequence
+        first_response = MockResponse("", [tool_call])  # Tool call response
+        json_response = MockResponse('{"name": "Alice", "age": 30, "hobbies": ["dancing", "singing"]}')  # Final JSON response
+        
+        provider.client.chat.completions.create.side_effect = [
+            first_response,  # First call returns tool call
+            json_response  # Second call returns JSON response
+        ]
+
+        # Create test tool
+        class TestParameters(BaseModel):
+            arg: str
+
+        class TestTool(BaseTool):
+            """Test tool for testing"""
+            def __init__(self):
+                super().__init__(
+                    name="test_tool",
+                    description="A test tool",
+                    parameters=TestParameters
+                )
+
+            def run(self, arg: str) -> str:
+                """Implement the sync run method"""
+                return f"Tool result: {arg}"
+
+            async def arun(self, arg: str) -> str:
+                """Implement the async run method"""
+                return self.run(arg)
+
+        messages = [
+            Message(role=Role.SYSTEM, content="You are a helpful assistant that uses tools when appropriate."),
+            Message(
+                role=Role.USER,
+                content="First use the test_tool with the message 'hello world', then create a JSON response about a person named Alice who is 30 and likes dancing and singing."
+            )
+        ]
+
+        response = await provider._aget_tool_completion(
+            messages=messages,
+            model="gemini-1.5-pro",
+            tools=[TestTool()],
+            temperature=0,
+            format_json=True,
+            json_schema=TestSchema
+        )
+
+        # Verify tool usage
+        assert response.tool_calls is not None
+        assert len(response.tool_calls) == 1
+        assert response.tool_calls[0]["function"]["name"] == "test_tool"
+        assert response.tool_calls[0]["function"]["arguments"] == '{"arg": "hello world"}'
+
+        # Verify JSON response
+        json_data = json.loads(response.content)
+        assert json_data["name"] == "Alice"
+        assert json_data["age"] == 30
+        assert "dancing" in json_data["hobbies"]
+        assert "singing" in json_data["hobbies"]
 
 
 if __name__ == "__main__":
