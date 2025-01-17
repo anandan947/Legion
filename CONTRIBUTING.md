@@ -18,9 +18,17 @@ Welcome! We're excited you're interested in contributing to Legion. This documen
    Three options here.
    - **Option 1**: Using `Makefile`
       Optioned and automated
-      - Requires you have `make` installed
+      - Requires you have `make` and `poetry` installed
       - `ENV` management options are currently `venv` or `conda`
       - `POETRY` can be set to `true` or `false` to use it, or `pip`
+
+      [Install Make](https://www.gnu.org/software/make/manual/make.html)
+
+      Install Poetry
+      ```bash
+      curl -sSL https://install.python-poetry.org | python3 -
+      ```
+
       ```bash
       make setup ENV=venv POETRY=false
       # or
