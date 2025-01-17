@@ -1,0 +1,10 @@
+services:
+  legion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+    command: poetry run pytest -v

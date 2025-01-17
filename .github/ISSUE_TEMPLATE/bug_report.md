@@ -22,7 +22,7 @@ assignees: ''
 
 ## Environment
 - OS: [e.g. Ubuntu 22.04]
-- Python Version: [e.g. 3.9.0]
+- Python Version: [e.g. 3.11.0]
 - Legion Version: [e.g. 1.0.0]
 - Other relevant dependencies:
 

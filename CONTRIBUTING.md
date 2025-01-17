@@ -15,23 +15,60 @@ Welcome! We're excited you're interested in contributing to Legion. This documen
    - Add upstream remote: `git remote add upstream https://github.com/LLMP-io/Legion.git`
 
 2. **Set Up Development Environment**
-   ```bash
-   # Run the setup script
-   python3 scripts/setup_env.py
+   Three options here.
+   - **Option 1**: Using `Makefile`
+      Optioned and automated
+      - Requires you have `make` installed
+      - `ENV` management options are currently `venv` or `conda`
+      - `POETRY` can be set to `true` or `false` to use it, or `pip`
+      ```bash
+      make setup ENV=venv POETRY=false
+      # or
+      make setup ENV=conda POETRY=true
+      # or
+      make  # Just use the defaults
+      ```
+      This will:
+      - Create and activate a virtual environment (with specified `ENV`)
+      - Install all dependencies (with `pip` or `poetry`)
+      - Set up pre-commit hooks
 
-   # Activate the virtual environment
-   # On macOS/Linux:
-   source venv/bin/activate
-   # On Windows:
-   # venv\Scripts\activate
-   ```
+      You can also:
+      ```bash
+      make lint POETRY=<true|false>
+      or
+      make test POETRY=<true|false>
+      ```
 
-   This will:
-   - Create a virtual environment
-   - Install all dependencies
-   - Set up pre-commit hooks
+   - **Option 2**: Using `setup.py`
+      Default and standard `venv`/`pip` setup
+      ```bash
+      # Run the setup script
+      python3 scripts/setup_env.py
 
-   Note: Make sure you have Python 3.8+ installed before running the setup script.
+      # Activate the virtual environment
+      # On macOS/Linux:
+      source venv/bin/activate
+      # On Windows:
+      # venv\Scripts\activate
+      ```
+      This will:
+      - Create and activate a virtual environment
+      - Install all dependencies
+      - Set up pre-commit hooks
+
+   - **Option 3**: 🐳 Whale you can just use `Docker`
+      If you have Docker installed and the docker engine running, from the
+      project root you can just run:
+      ```bash
+      docker compose up --build
+      ```
+      This will spin up a cointainer, build the project to it, and run the tests.
+      Want to keep it running and get a shell on it to run other commands?
+      ```bash
+      docker compose up -d  # detached
+      docker compose exec legion bash
+      ```
 
 3. **Configure Git Email**
    To maintain privacy while contributing, you can use a GitHub-provided no-reply email address:
@@ -47,6 +84,7 @@ Welcome! We're excited you're interested in contributing to Legion. This documen
    # or
    git checkout -b fix/your-bug-fix
    ```
+
 
 ## Development Guidelines
 

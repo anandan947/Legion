@@ -6,7 +6,6 @@ import os
 from typing import Any, Dict, List, Optional, Sequence, Type
 from unittest.mock import MagicMock
 
-from openai import OpenAI
 from pydantic import BaseModel
 
 from ..errors import ProviderError
@@ -53,7 +52,7 @@ class GeminiProvider(LLMInterface):
         api_key = self.config.api_key if self.config else None
         if not api_key:
             api_key = os.getenv("GEMINI_API_KEY")
-        
+
         if not api_key:
             raise ProviderError("API key is required")
 
@@ -74,10 +73,10 @@ class GeminiProvider(LLMInterface):
         formatted_messages = []
         for message in messages:
             formatted = {"role": message.role.value}
-            
+
             # Ensure content is never None/empty for Gemini
             formatted["content"] = message.content if message.content else " "  # Use space instead of empty string
-            
+
             if message.tool_calls:
                 formatted["tool_calls"] = []
                 for tool_call in message.tool_calls:
@@ -92,15 +91,15 @@ class GeminiProvider(LLMInterface):
                                 "arguments": tool_call.arguments
                             }
                         })
-            
+
             if message.role == Role.TOOL:
                 if message.name:
                     formatted["name"] = message.name
                 if message.tool_call_id:
                     formatted["tool_call_id"] = message.tool_call_id
-            
+
             formatted_messages.append(formatted)
-        
+
         return formatted_messages
 
     def _extract_content(self, response: Any) -> str:
@@ -109,7 +108,7 @@ class GeminiProvider(LLMInterface):
             message = response.choices[0].message
             if message.content:
                 return message.content
-            elif hasattr(message, 'tool_calls') and message.tool_calls:
+            elif hasattr(message, "tool_calls") and message.tool_calls:
                 # If no content but has tool calls, return a descriptive message
                 tool_names = [tc.function.name for tc in message.tool_calls]
                 return f"Using tools: {', '.join(tool_names)}"
@@ -121,9 +120,9 @@ class GeminiProvider(LLMInterface):
         """Extract tool calls from response."""
         try:
             message = response.choices[0].message
-            if not hasattr(message, 'tool_calls') or not message.tool_calls:
+            if not hasattr(message, "tool_calls") or not message.tool_calls:
                 return None
-            
+
             tool_calls = []
             for tool_call in message.tool_calls:
                 # Handle both MagicMock and actual response objects
@@ -194,27 +193,27 @@ class GeminiProvider(LLMInterface):
     def _validate_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and format request parameters"""
         validated = {}
-        
+
         # Handle temperature
         if "temperature" in params and params["temperature"] is not None:
             temp = float(params["temperature"])
             if not 0 <= temp <= 1:
                 raise ProviderError("Temperature must be between 0 and 1")
             validated["temperature"] = temp
-        
+
         # Handle max tokens
         if "max_tokens" in params and params["max_tokens"] is not None:
             max_tokens = int(params["max_tokens"])
             if max_tokens < 1:
                 raise ProviderError("max_tokens must be greater than 0")
             validated["max_tokens"] = max_tokens
-        
+
         # Remove unsupported parameters
         unsupported = ["top_p", "frequency_penalty", "presence_penalty", "top_logprobs"]
         for param in unsupported:
             if param in params:
                 params.pop(param)
-        
+
         return validated
 
     def _get_chat_completion(
@@ -249,24 +248,24 @@ class GeminiProvider(LLMInterface):
                 "temperature": temperature,
                 "max_tokens": max_tokens
             })
-            
+
             # Get model name
             model = self.SUPPORTED_MODELS.get(model, model)
-            
+
             # Make the API call
             response = await self.client.chat.completions.create(
                 model=model,
                 messages=formatted_messages,
                 **validated_params
             )
-            
+
             return ModelResponse(
                 content=self._extract_content(response),
                 raw_response=self._response_to_dict(response),
                 usage=self._extract_usage(response),
                 tool_calls=None
             )
-            
+
         except Exception as e:
             raise ProviderError(f"Gemini completion failed: {str(e)}")
 
@@ -379,7 +378,7 @@ class GeminiProvider(LLMInterface):
         """Get a tool completion from the Gemini API."""
         try:
             formatted_messages = self._format_messages(messages)
-            
+
             params = self._validate_request({
                 "temperature": temperature,
                 "max_tokens": max_tokens
@@ -411,7 +410,7 @@ class GeminiProvider(LLMInterface):
                 for tool_call in tool_calls:
                     tool_name = tool_call["function"]["name"]
                     tool_args = json.loads(tool_call["function"]["arguments"])
-                    
+
                     # Find the matching tool
                     tool = next((t for t in tools if t.name == tool_name), None)
                     if tool:
@@ -426,7 +425,7 @@ class GeminiProvider(LLMInterface):
                             tool_results.append(result)
                         else:
                             tool_results.append(f"{tool_name} result: {result}")
-                
+
                 # Format the results nicely
                 if tool_results:
                     content = "\n".join(tool_results)

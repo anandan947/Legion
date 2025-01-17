@@ -2,11 +2,10 @@
 
 import json
 import os
-from typing import List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from dotenv import load_dotenv
 from pydantic import BaseModel
 
 from legion.errors import ProviderError
@@ -14,6 +13,8 @@ from legion.interface.schemas import Message, ProviderConfig, Role
 from legion.interface.tools import BaseTool
 from legion.providers.gemini import GeminiFactory, GeminiProvider
 
+# Load environment variables
+load_dotenv()
 
 class MockResponse:
     """Mock response for testing"""
@@ -70,7 +71,7 @@ class TestGeminiProvider:
             mock_instance.chat = AsyncMock()
             mock_instance.chat.completions = AsyncMock()
             mock_instance.chat.completions.create = AsyncMock()
-            
+
             config = ProviderConfig(api_key="test-key")
             provider = GeminiProvider(config=config, debug=True)
             provider._setup_client()  # Initialize with mock
@@ -82,7 +83,7 @@ class TestGeminiProvider:
         # Remove any environment variable
         if "GEMINI_API_KEY" in os.environ:
             del os.environ["GEMINI_API_KEY"]
-            
+
         with pytest.raises(ProviderError, match="API key is required"):
             provider = GeminiProvider(config=ProviderConfig())
             provider._setup_client()
@@ -91,7 +92,7 @@ class TestGeminiProvider:
         """Test setup with environment API key"""
         with patch("openai.AsyncOpenAI") as mock:
             os.environ["GEMINI_API_KEY"] = "test-key"
-            provider = GeminiProvider(config=ProviderConfig())
+            GeminiProvider(config=ProviderConfig())
             mock.assert_called_once_with(
                 api_key="test-key",
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -124,14 +125,14 @@ class TestGeminiProvider:
         function_mock = MagicMock()
         function_mock.name = "test_tool"  # Set as string instead of MagicMock
         function_mock.arguments = '{"arg": "value"}'
-        
+
         tool_call = MagicMock(
             id="call-123",
             type="function",
             function=function_mock
         )
         first_response = MockResponse("Tool result: value", [tool_call])
-        
+
         # Set up response
         provider.client.chat.completions.create.return_value = first_response
 
@@ -141,6 +142,7 @@ class TestGeminiProvider:
 
         class TestTool(BaseTool):
             """Test tool for testing"""
+
             def __init__(self):
                 super().__init__(
                     name="test_tool",

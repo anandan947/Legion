@@ -110,7 +110,7 @@ class AnthropicProvider(LLMInterface):
                 "temperature": params.temperature,
                 "max_tokens": params.max_tokens or self.DEFAULT_MAX_TOKENS
             }
-            
+
             # Only add system if it's not None
             if system_message is not None:
                 request_params["system"] = system_message
@@ -384,7 +384,7 @@ class AnthropicProvider(LLMInterface):
                 elif self.debug:
                     print(f"Skipping non-text block of type: {getattr(block, 'type', 'unknown')}")
             return " ".join(text_blocks).strip()
-        
+
         return str(response.content).strip()
 
     def _extract_usage(self, response: Any) -> TokenUsage:
