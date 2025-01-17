@@ -1,3 +1,5 @@
+LICENSE
+README.md
 setup.py
 legion/__init__.py
 legion/exceptions.py
