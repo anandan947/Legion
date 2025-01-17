@@ -1,7 +1,7 @@
 # Environment Setup
 setup-venv:
 	python3 -m venv venv
-	. venv/bin/activate && pip install $(if $(POETRY),poetry,) -r requirements.txt
+	. venv/bin/activate && pip install -r requirements.txt
 
 setup-conda:
 	@echo "Setting up Conda environment..."
