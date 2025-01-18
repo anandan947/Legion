@@ -60,7 +60,6 @@ class AnthropicProvider(LLMInterface):
 
             # Handle different message types
             if msg.tool_calls:
-                # Format tool calls from assistant
                 formatted_msg["content"] = [{
                     "type": "tool_use",
                     "id": tool_call["id"],
@@ -68,14 +67,6 @@ class AnthropicProvider(LLMInterface):
                     "input": json.loads(tool_call["function"]["arguments"])
                 } for tool_call in msg.tool_calls]
             elif msg.role == Role.TOOL and msg.tool_call_id:
-                # Format tool results from tool
-                formatted_msg["content"] = [{
-                    "type": "tool_result",
-                    "tool_use_id": msg.tool_call_id,
-                    "content": msg.content
-                }]
-            elif msg.role == Role.USER and msg.tool_call_id:
-                # Format tool results from user (converted from tool)
                 formatted_msg["content"] = [{
                     "type": "tool_result",
                     "tool_use_id": msg.tool_call_id,
@@ -88,15 +79,6 @@ class AnthropicProvider(LLMInterface):
             anthropic_messages.append(formatted_msg)
 
         return anthropic_messages
-
-    def _format_tool(self, tool: BaseTool) -> Dict[str, Any]:
-        """Format a tool for Anthropic API"""
-        schema = tool.parameters.model_json_schema()
-        return {
-            "name": tool.name,
-            "description": tool.description,
-            "input_schema": schema
-        }
 
     def _get_chat_completion(
         self,
@@ -200,87 +182,126 @@ class AnthropicProvider(LLMInterface):
             else:
                 system_message = tool_instructions
 
+            # Format tools for Anthropic
+            anthropic_tools = []
+            for tool in tools:
+                schema = tool.parameters.model_json_schema()
+                anthropic_tools.append({
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": {
+                        "type": "object",
+                        "properties": schema.get("properties", {}),
+                        "required": schema.get("required", [])
+                    }
+                })
+
             # Initialize conversation history
+            conversation = []
             current_messages = messages.copy()
+            final_response = None
             final_tool_calls = []
 
             while True:
-                # Format current messages for Anthropic
-                formatted_messages = self._format_messages(current_messages)
+                # Format current messages
+                formatted_messages = []
+                current_interaction = []
 
-                # Create request parameters
-                request_params = {
+                for msg in current_messages:
+                    if msg.role == Role.SYSTEM:
+                        continue
+
+                    if msg.role == Role.USER and current_interaction:
+                        formatted_messages.extend(self._format_messages(current_interaction))
+                        current_interaction = []
+
+                    current_interaction.append(msg)
+
+                if current_interaction:
+                    formatted_messages.extend(self._format_messages(current_interaction))
+
+                # Create request
+                request_kwargs = {
                     "model": model,
                     "messages": formatted_messages,
+                    "tools": anthropic_tools,
                     "temperature": temperature,
                     "max_tokens": max_tokens or self.DEFAULT_MAX_TOKENS,
-                    "tools": [self._format_tool(t) for t in tools]
+                    "system": system_message,
+                    "tool_choice": {"type": "auto", "disable_parallel_tool_use": True}
                 }
 
-                if system_message:
-                    request_params["system"] = system_message
+                if self.debug:
+                    print("\nSending messages to Anthropic:")
+                    for msg in formatted_messages:
+                        print(f"Role: {msg['role']}")
+                        print(f"Content: {msg['content']}\n")
 
-                response = self.client.messages.create(**request_params)
+                response = self.client.messages.create(**request_kwargs)
 
                 content = self._extract_content(response)
                 tool_calls = self._extract_tool_calls(response)
 
-                # If no tool calls, we're done
-                if not tool_calls:
-                    # If JSON formatting requested, format the final response
-                    if format_json and json_schema:
-                        json_messages = self._create_json_conversation(current_messages, json_schema)
-                        json_response = self._get_json_completion(
-                            messages=json_messages,
-                            model=model,
-                            schema=json_schema,
-                            temperature=0.0,
-                            max_tokens=max_tokens
-                        )
-                        # Preserve tool calls in the JSON response
-                        return ModelResponse(
-                            content=json_response.content,
-                            raw_response=json_response.raw_response,
-                            usage=json_response.usage,
-                            tool_calls=final_tool_calls
-                        )
-
-                    return ModelResponse(
-                        content=content,
-                        raw_response=response.model_dump(),
-                        tool_calls=final_tool_calls if final_tool_calls else None,
-                        usage=self._extract_usage(response)
-                    )
-
-                # Add tool call to conversation
-                current_messages.append(Message(
+                # Add assistant's response to conversation
+                assistant_msg = Message(
                     role=Role.ASSISTANT,
                     content=content,
                     tool_calls=tool_calls
-                ))
+                )
+                conversation.append(assistant_msg)
+                current_messages.append(assistant_msg)
 
-                # Store tool calls for final response
-                final_tool_calls.extend(tool_calls)
+                if tool_calls:
+                    final_tool_calls.extend(tool_calls)
+                    # Process tool calls
+                    for tool_call in tool_calls:
+                        tool = next(
+                            (t for t in tools if t.name == tool_call["function"]["name"]),
+                            None
+                        )
+                        if tool:
+                            try:
+                                args = json.loads(tool_call["function"]["arguments"])
+                                result = tool(**args)
 
-                # Process each tool call
-                for tool_call in tool_calls:
-                    tool = next(
-                        (t for t in tools if t.name == tool_call["function"]["name"]),
-                        None
-                    )
+                                # Add tool response to conversation
+                                tool_msg = Message(
+                                    role=Role.TOOL,
+                                    content=str(result),
+                                    tool_call_id=tool_call["id"],
+                                    name=tool_call["function"]["name"]
+                                )
+                                conversation.append(tool_msg)
+                                current_messages.append(tool_msg)
+                            except Exception as e:
+                                raise ProviderError(f"Error executing {tool.name}: {str(e)}")
+                else:
+                    # No more tool calls, this is our final response
+                    final_response = response
+                    break
 
-                    if tool:
-                        args = json.loads(tool_call["function"]["arguments"])
-                        result = tool.run(**args)
+            if self.debug and final_tool_calls:
+                print("\nTool calls triggered:")
+                for call in final_tool_calls:
+                    print(f"- {call['function']['name']}: {call['function']['arguments']}")
+                if content:
+                    print(f"\nAssistant message: {content}")
 
-                        # Add tool response to conversation
-                        current_messages.append(Message(
-                            role=Role.USER,  # Change from Role.TOOL to Role.USER
-                            content=json.dumps(result) if isinstance(result, dict) else str(result),
-                            tool_call_id=tool_call["id"],
-                            name=tool_call["function"]["name"]
-                        ))
+            # If JSON formatting was requested, validate the response
+            content = self._extract_content(final_response)
+            if format_json and json_schema:
+                try:
+                    data = json.loads(content)
+                    json_schema.model_validate(data)
+                except Exception as e:
+                    raise ProviderError(f"Invalid JSON response: {str(e)}")
 
+            return ModelResponse(
+                content=content,
+                raw_response=final_response.model_dump(),
+                usage=self._extract_usage(final_response),
+                tool_calls=final_tool_calls if final_tool_calls else None
+            )
         except Exception as e:
             raise ProviderError(f"Anthropic tool completion failed: {str(e)}")
 

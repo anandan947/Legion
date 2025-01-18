@@ -40,8 +40,7 @@ class SimpleTool(BaseTool):
 @pytest.fixture
 def provider():
     config = ProviderConfig(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        organization_id=os.getenv("OPENAI_ORG_ID")
+        api_key=os.getenv("OPENAI_API_KEY", "test-key")
     )
     return OpenAIProvider(config=config)
 
@@ -55,8 +54,7 @@ def test_provider_initialization(provider):
 
 def test_factory_creation(factory):
     config = ProviderConfig(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        organization_id=os.getenv("OPENAI_ORG_ID")
+        api_key=os.getenv("OPENAI_API_KEY", "test-key")
     )
     provider = factory.create_provider(config=config)
     assert isinstance(provider, OpenAIProvider)
@@ -141,6 +139,20 @@ async def test_tool_and_json_completion(provider):
     assert isinstance(data.hobbies, list)
 
 @pytest.mark.asyncio
+async def test_async_completion(provider):
+    messages = [
+        Message(role=Role.USER, content="Say 'Hello, World!'")
+    ]
+    response = await provider.acomplete(
+        messages=messages,
+        model="gpt-4o-mini",
+        temperature=0
+    )
+    assert isinstance(response, ModelResponse)
+    assert isinstance(response.content, str)
+    assert len(response.content) > 0
+
+@pytest.mark.asyncio
 async def test_invalid_api_key():
     config = ProviderConfig(api_key="invalid_key")
     provider = OpenAIProvider(config=config)
@@ -149,8 +161,7 @@ async def test_invalid_api_key():
     with pytest.raises(ProviderError):
         await provider.complete(
             messages=messages,
-            model="gpt-4o-mini",
-            temperature=0.7
+            model="gpt-4o-mini"
         )
 
 @pytest.mark.asyncio
@@ -160,8 +171,7 @@ async def test_invalid_model(provider):
     with pytest.raises(ProviderError):
         await provider.complete(
             messages=messages,
-            model="invalid-model",
-            temperature=0.7
+            model="invalid-model"
         )
 
 @pytest.mark.asyncio
