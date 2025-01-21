@@ -149,9 +149,9 @@ class Agent:
         else:
             raise ValueError(f"Unsupported message format: {type(message)}")
 
-    def _log_message(self, message: str, level: str = "info", color: str = None) -> None:
+    def _log_message(self, message: str, verbose: bool = False, color: str = None) -> None:
         """Internal method for consistent logging"""
-        if self.verbose:
+        if verbose:
             if color:
                 rprint(f"\n[{color}]{message}[/{color}]")
             else:
@@ -161,22 +161,22 @@ class Agent:
         """Log response details when in verbose mode"""
         if self.verbose:
             self._log_message("Agent Response:", color="bold green")
-            rprint(response.content)
+            self._log_message(response.content)
 
             if response.usage:
                 self._log_message("Token Usage:", color="bold blue")
-                rprint(f"Input tokens: {response.usage.prompt_tokens}")
-                rprint(f"Output tokens: {response.usage.completion_tokens}")
-                rprint(f"Total tokens: {response.usage.total_tokens}")
+                self._log_message(f"Input tokens: {response.usage.prompt_tokens}")
+                self._log_message(f"Output tokens: {response.usage.completion_tokens}")
+                self._log_message(f"Total tokens: {response.usage.total_tokens}")
 
             if response.tool_calls:
                 self._log_message("Tool Calls:", color="bold yellow")
                 for tool_call in response.tool_calls:
-                    rprint(f"Tool: {tool_call['function']['name']}")
-                    rprint(f"Arguments: {tool_call['function']['arguments']}")
+                    self._log_message(f"Tool: {tool_call['function']['name']}")
+                    self._log_message(f"Arguments: {tool_call['function']['arguments']}")
                     if "result" in tool_call:
-                        rprint(f"Result: {tool_call['result']}")
-                    rprint("---")
+                        self._log_message(f"Result: {tool_call['result']}")
+                    self._log_message("---")
 
     async def _aprocess(
         self,
@@ -187,16 +187,15 @@ class Agent:
         verbose: bool = False
     ) -> ModelResponse:
         """Process a message asynchronously and return a response"""
-        if self.debug:
-            print(f"\n🤖 Agent {self.name} processing:")
-            print(f"Temperature: {self.temperature}")
-            print(f"Model: {self.model}")
-            print(f"Tools: {[t.name for t in self._tools]}")
-            print(f"Response Schema: {response_schema.__name__ if response_schema else 'None'}")
-            if dynamic_values:
-                print(f"Dynamic Values: {dynamic_values}")
-            if injected_parameters:
-                print(f"Injected Parameters: {injected_parameters}")
+        self._log_message(f"\n🤖 Agent {self.name} processing:", verbose=verbose, color="bold blue")
+        self._log_message(f"Temperature: {self.temperature}", verbose=verbose)
+        self._log_message(f"Model: {self.model}", verbose=verbose)
+        self._log_message(f"Tools: {[t.name for t in self._tools]}", verbose=verbose)
+        self._log_message(f"Response Schema: {response_schema.__name__ if response_schema else 'None'}", verbose=verbose)
+        if dynamic_values:
+            self._log_message(f"Dynamic Values: {dynamic_values}", verbose=verbose)
+        if injected_parameters:
+            self._log_message(f"Injected Parameters: {injected_parameters}", verbose=verbose)
 
         # Convert message to proper format
         message_obj = self._create_message(message)
@@ -216,15 +215,15 @@ class Agent:
         self.memory.add_message(message_obj)
 
         if self.debug:
-            print("\n📨 System Prompt:")
-            print(enhanced_prompt)
-            print("\n📨 User Message:")
-            print(f"Content: {message_obj.content}")
+            self._log_message("\n📨 System Prompt:", verbose=verbose, color="bold blue")
+            self._log_message(enhanced_prompt, verbose=verbose)
+            self._log_message("\n📨 User Message:", verbose=verbose, color="bold blue")
+            self._log_message(f"Content: {message_obj.content}", verbose=verbose)
 
         try:
             # Get response from provider
             if self.debug:
-                print("\n🔄 Getting response from provider...")
+                self._log_message("\n🔄 Getting response from provider...", verbose=verbose, color="bold yellow")
 
             response = await self.llm.acomplete(
                 messages=self.memory.messages,  # Use full conversation history
@@ -271,7 +270,7 @@ class Agent:
                             tool_results.append(str(result))
                         except Exception as e:
                             if self.debug:
-                                print(f"\n❌ Tool execution failed: {str(e)}")
+                                self._log_message(f"\n❌ Tool execution failed: {str(e)}", verbose=verbose, color="bold red")
                             raise
 
                 # Combine tool results into final response
@@ -284,18 +283,21 @@ class Agent:
                 )
 
             if self.debug:
-                print("\n✅ Got response from provider:")
-                print(f"Content: {response.content[:200]}...")
+                self._log_message("\n✅ Got response from provider:", verbose=verbose, color="bold green")
+                if len(response.content) > 200:
+                    self._log_message(f"Content: {response.content[:200]}...", verbose=verbose, color="bold blue")
+                else:
+                    self._log_message(f"Content: {response.content}", verbose=verbose, color="bold blue")
                 if response.tool_calls:
-                    print("\nTool Calls:")
+                    self._log_message("\nTool Calls:", verbose=verbose, color="bold blue")
                     for tc in response.tool_calls:
-                        print(f"- {tc['function']['name']}: {tc['function']['arguments']}")
+                        self._log_message(f"- {tc['function']['name']}: {tc['function']['arguments']}", verbose=verbose)
 
             return response
 
         except Exception as e:
             if self.debug:
-                print(f"\n❌ Error in agent processing: {str(e)}")
+                self._log_message(f"\n❌ Error in agent processing: {str(e)}", verbose=verbose, color="bold red")
             raise
 
     def process(
