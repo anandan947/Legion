@@ -1,6 +1,7 @@
 import inspect
 import logging
 from typing import List, Optional, Type
+
 from rich import print as rprint
 from rich.console import Console
 
