@@ -1,7 +1,6 @@
-from .decorators import output_schema, param, schema, tool
+from .decorators import output_schema, param, schema
 
 __all__ = [
-    "tool",
     "schema",
     "output_schema",
     "param"
