@@ -159,24 +159,24 @@ class Agent:
 
     def _log_response(self, response: ModelResponse, verbose: bool = False) -> None:
         """Log response details when in verbose mode"""
-        if verbose:
-            self._log_message("Agent Response:", verbose, "bold green")
-            self._log_message(response.content, verbose)
 
-            if response.usage:
-                self._log_message("Token Usage:", verbose, "bold blue")
-                self._log_message(f"Input tokens: {response.usage.prompt_tokens}", verbose)
-                self._log_message(f"Output tokens: {response.usage.completion_tokens}", verbose)
-                self._log_message(f"Total tokens: {response.usage.total_tokens}", verbose)
+        self._log_message("Agent Response:", verbose, "bold green")
+        self._log_message(response.content, verbose)
 
-            if response.tool_calls:
-                self._log_message("Tool Calls:", verbose, "bold blue")
-                for tool_call in response.tool_calls:
-                    self._log_message(f"Tool: {tool_call['function']['name']}", verbose, "bold yellow")
-                    self._log_message(f"Arguments: {tool_call['function']['arguments']}", verbose)
-                    if "result" in tool_call:
-                        self._log_message(f"Result: {tool_call['result']}", verbose)
-                    self._log_message("---", verbose)
+        if response.usage:
+            self._log_message("Token Usage:", verbose, "bold blue")
+            self._log_message(f"Input tokens: {response.usage.prompt_tokens}", verbose)
+            self._log_message(f"Output tokens: {response.usage.completion_tokens}", verbose)
+            self._log_message(f"Total tokens: {response.usage.total_tokens}", verbose)
+
+        if response.tool_calls:
+            self._log_message("Tool Calls:", verbose, "bold blue")
+            for tool_call in response.tool_calls:
+                self._log_message(f"Tool: {tool_call['function']['name']}", verbose, "bold yellow")
+                self._log_message(f"Arguments: {tool_call['function']['arguments']}", verbose)
+                if "result" in tool_call:
+                    self._log_message(f"Result: {tool_call['result']}", verbose)
+                self._log_message("---", verbose)
 
     async def _aprocess(
         self,
@@ -187,6 +187,7 @@ class Agent:
         verbose: bool = False
     ) -> ModelResponse:
         """Process a message asynchronously and return a response"""
+
         if verbose:
             self.print_hierarchy()
 
@@ -408,7 +409,7 @@ class Agent:
 
     def print_hierarchy(self, indent: str = "") -> None:
         """Print agent in hierarchy"""
-        rprint(f"{indent}[cyan]└──[/cyan] [bold]{self.name}[/bold] ([yellow]Agent[/yellow])")
+        rprint(f"{indent}[cyan]\n└──[/cyan] [bold]{self.name}[/bold] ([yellow]Agent[/yellow])")
 
         # Print tools if any
         if self.tools:

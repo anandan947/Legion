@@ -27,7 +27,7 @@ def agent(
     if temperature < 0 or temperature > 1:
         raise ValueError("Temperature must be between 0 and 1")
 
-    def _log_message(message: str, level: str = "info", color: str = None) -> None:
+    def _log_message(message: str, color: str = None) -> None:
         """Internal method for consistent logging"""
         if debug:
             if color:
@@ -36,9 +36,9 @@ def agent(
                 rprint(f"\n{message}")
 
     def decorator(cls: Type) -> Type:
-        if debug:
-            _log_message(f"Decorating class {cls.__name__}")
-            _log_message(f"Original class bases: {cls.__bases__}")
+
+        _log_message(f"Decorating class {cls.__name__}", color="bold blue")
+        _log_message(f"Original class bases: {cls.__bases__}")
 
         # Get system prompt from decorator or fallback to docstring
         if system_prompt is not None:  # Check decorator param first
@@ -71,10 +71,9 @@ def agent(
 
         def __init__(self, *args, **kwargs):
 
-            if debug:
-                _log_message(f"Initializing {cls.__name__} instance")
-                _log_message(f"Instance type: {type(self)}")
-                _log_message(f"Instance bases: {type(self).__bases__}")
+            _log_message(f"Initializing {cls.__name__} instance", color="bold blue")
+            _log_message(f"Instance type: {type(self)}")
+            _log_message(f"Instance bases: {type(self).__bases__}")
 
             # Initialize Agent with config and proper name
             agent_config = {
@@ -82,10 +81,9 @@ def agent(
                 "name": cls.__name__  # Always use the class name
             }
 
-            logger.debug("Calling Agent.__init__")
+            _log_message("Calling Agent.__init__", color="bold blue")
             Agent.__init__(self, **agent_config)
-            if debug:
-                _log_message("✅Agent.__init__ completed", color="bold green")
+            _log_message("✅Agent.__init__ completed", color="bold green")
 
             # Initialize tools list
             self._tools = []
@@ -104,7 +102,7 @@ def agent(
 
             # Add tools passed to decorator
             if tools:
-                _log_message("Adding tools from decorator")
+                _log_message("Adding tools from decorator", color="bold blue")
                 for tool in tools:
                     _log_message(f"Binding external tool {tool.name} to instance")
                     self._tools.append(tool.bind_to(self))
@@ -119,11 +117,10 @@ def agent(
 
             # Call the original class's __init__ if it exists
             if original_init:
-                _log_message("Calling original __init__")
+                _log_message("Calling original __init__", color="bold yellow")
                 original_init(self, *args, **kwargs)
 
-            if self.debug:
-                _log_message(f"✅Registered tools: {[t.name for t in self._tools]}", color="bold green")
+            _log_message(f"✅Registered tools: {[t.name for t in self._tools]}", color="bold green")
 
         # Create new class attributes
         attrs = {
