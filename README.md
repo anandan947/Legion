@@ -295,9 +295,19 @@ The `examples` directory contains several examples that demonstrate how to use L
 
 ### Option 1: Using `Makefile`
 Optioned and automated
-- Requires you have `make` installed
+- Requires you have `make` and `poetry` installed
 - `ENV` management options are currently `venv` or `conda`
 - `POETRY` can be set to `true` or `false` to use it, or `pip`
+
+2a. [Install Make](https://www.gnu.org/software/make/manual/make.html)
+
+2b. Install Poetry
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+2c. Set up the environment
+
 ```bash
 make setup ENV=venv POETRY=false
 # or
