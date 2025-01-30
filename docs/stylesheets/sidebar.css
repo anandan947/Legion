@@ -1,0 +1,40 @@
+/* Navigation styling */
+.md-nav__title {
+    font-size: 0.90rem;
+    font-weight: 600;
+    color: var(--md-default-fg-color);
+    margin: 1rem 0 0.4rem 0;
+}
+
+.md-nav__link {
+    font-size: 0.70rem;
+    color: var(--md-default-fg-color--light);
+}
+
+.md-nav__link:hover,
+.md-nav__link--active {
+    color: var(--md-accent-fg-color) !important;
+}
+
+.md-nav__item .md-nav__item {
+    padding-left: 0.6rem;
+}
+
+.md-nav__list {
+    padding-left: 1rem;
+}
+
+.md-nav__item--active > .md-nav__link {
+    color: var(--md-accent-fg-color) !important;
+}
+
+/* TOC active item */
+.md-nav--secondary .md-nav__link--active {
+    color: var(--md-accent-fg-color) !important;
+}
+
+/* Search result highlighting */
+.md-search-result__link:hover,
+.md-search-result__link[data-md-state="active"] {
+    background-color: var(--md-accent-fg-color--transparent);
+}

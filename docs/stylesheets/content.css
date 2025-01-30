@@ -1,0 +1,54 @@
+/* Main content text sizing */
+.md-typeset {
+    font-size: 0.70rem;
+    line-height: 1.5;
+}
+
+.md-typeset h1 {
+    font-size: 1.4rem;
+}
+
+.md-typeset h2 {
+    font-size: 1.1rem;
+}
+
+.md-typeset h3 {
+    font-size: 0.9rem;
+}
+
+.md-typeset h4 {
+    font-size: 0.8rem;
+}
+
+.md-typeset code {
+    font-size: 0.70rem;
+}
+
+.md-typeset pre {
+    font-size: 0.70rem;
+}
+
+/* Improve code block contrast */
+[data-md-color-scheme="slate"] .highlight {
+    background-color: #1a1a1a;
+}
+
+/* Better table contrast */
+[data-md-color-scheme="slate"] table {
+    background-color: var(--md-default-bg-color--light);
+}
+
+[data-md-color-scheme="slate"] th {
+    background-color: var(--md-default-bg-color--lighter);
+}
+
+/* Better blockquote styling */
+[data-md-color-scheme="slate"] blockquote {
+    border-left-color: var(--md-accent-fg-color);
+    background-color: var(--md-default-bg-color--light);
+}
+
+/* Selection highlight */
+::selection {
+    background-color: var(--md-accent-fg-color--transparent);
+}

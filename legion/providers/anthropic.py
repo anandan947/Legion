@@ -110,7 +110,7 @@ class AnthropicProvider(LLMInterface):
                 "temperature": params.temperature,
                 "max_tokens": params.max_tokens or self.DEFAULT_MAX_TOKENS
             }
-            
+
             # Only add system if it's not None
             if system_message is not None:
                 request_params["system"] = system_message
@@ -384,7 +384,7 @@ class AnthropicProvider(LLMInterface):
                 elif self.debug:
                     print(f"Skipping non-text block of type: {getattr(block, 'type', 'unknown')}")
             return " ".join(text_blocks).strip()
-        
+
         return str(response.content).strip()
 
     def _extract_usage(self, response: Any) -> TokenUsage:
@@ -422,10 +422,20 @@ class AnthropicProvider(LLMInterface):
         model: str,
         tools: Sequence[BaseTool],
         temperature: float,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        format_json: bool = False,
+        json_schema: Optional[Type[BaseModel]] = None
     ) -> ModelResponse:
         """Get a chat completion with tool use asynchronously"""
-        return self._get_tool_completion(messages, model, tools, temperature, max_tokens)
+        return self._get_tool_completion(
+            messages=messages,
+            model=model,
+            tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            format_json=format_json,
+            json_schema=json_schema
+        )
 
     async def _aget_json_completion(
         self,
@@ -437,75 +447,3 @@ class AnthropicProvider(LLMInterface):
     ) -> ModelResponse:
         """Get a chat completion formatted as JSON asynchronously"""
         return self._get_json_completion(messages, model, schema, temperature, max_tokens)
-
-    def complete(
-        self,
-        messages: List[Message],
-        model: str,
-        tools: Optional[Sequence[BaseTool]] = None,
-        temperature: float = 1.0,
-        response_schema: Optional[Type[BaseModel]] = None,
-        max_tokens: Optional[int] = None
-    ) -> ModelResponse:
-        """Get a completion with optional tools and JSON formatting"""
-        if self.debug:
-            print("\n🔌 Anthropic Provider:")
-            print(f"Model: {model}")
-            print(f"Temperature: {temperature}")
-            print(f"Tools: {[t.name for t in (tools or [])]}")
-            print(f"Response Schema: {response_schema.__name__ if response_schema else 'None'}")
-            print("\nMessages:")
-            for msg in messages:
-                print(f"{msg.role}: {msg.content[:100]}...")
-
-        try:
-            if tools:
-                if self.debug:
-                    print("\n🛠️ Making tool completion request...")
-                    print("Tool schemas:")
-                    for tool in tools:
-                        print(f"\n{tool.name}:")
-                        print(json.dumps(tool.parameters.model_json_schema(), indent=2))
-
-                return self._get_tool_completion(
-                    messages=messages,
-                    model=model,
-                    tools=tools,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    format_json=bool(response_schema),
-                    json_schema=response_schema
-                )
-            elif response_schema:
-                if self.debug:
-                    print("\n📋 Making JSON completion request...")
-                    print("Schema:")
-                    print(json.dumps(response_schema.model_json_schema(), indent=2))
-
-                return self._get_json_completion(
-                    messages=messages,
-                    model=model,
-                    schema=response_schema,
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-            else:
-                if self.debug:
-                    print("\n💬 Making basic completion request...")
-
-                params = ChatParameters(
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                return self._get_chat_completion(
-                    messages=messages,
-                    model=model,
-                    params=params
-                )
-        except Exception as e:
-            if self.debug:
-                print(f"\n❌ Provider error: {str(e)}")
-                print(f"Error type: {type(e)}")
-                import traceback
-                print(f"Traceback:\n{traceback.format_exc()}")
-            raise

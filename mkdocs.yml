@@ -1,0 +1,98 @@
+site_name: Legion Documentation
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github
+
+site_url: https://LLMP-io.github.io/Legion/
+repo_url: https://github.com/LLMP-io/Legion
+repo_name: LLMP-io/Legion
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/LLMP-io/Legion
+      name: Legion on GitHub
+
+extra_css:
+  - stylesheets/footer.css
+  - stylesheets/content.css
+  - stylesheets/navbar.css
+  - stylesheets/sidebar.css
+  - stylesheets/theme.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Basic Concepts: getting-started/basic-concepts.md
+    - First Agent: getting-started/first-agent.md
+
+  - Core Concepts:
+    - Agents:
+      - Agent Definition: core-concepts/agents/agent-definition.md
+      - System Prompts: core-concepts/agents/system-prompts.md
+      - Agent State: core-concepts/agents/agent-state.md
+      - Agent Communication: core-concepts/agents/agent-communication.md
+    - Tools:
+      - Tool Decorators: core-concepts/tools/tool-decorators.md
+      - Parameter Injection: core-concepts/tools/parameter-injection.md
+      - Tool Development: core-concepts/tools/tool-development.md
+      - Built-in Tools: core-concepts/tools/built-in-tools.md
+    - Providers:
+      - Supported LLM Providers: core-concepts/providers/supported-providers.md
+      - Provider Configuration: core-concepts/providers/provider-configuration.md
+  - Examples & Tutorials:
+    - Basic Examples: examples/basic-examples.md
+    - Build a chatbot: examples/chatbot.md
+  - Contributing:
+    - Contribution Guide: contributing/index.md
+    - Project Structure: contributing/project-structure.md
+    - Architecture Overview: contributing/architecture.md
+    - Development Setup: contributing/setup-development.md
+    - Troubleshooting: contributing/troubleshooting.md
+    - Documentation Guide: DOCUMENTATION_GUIDE.md
+  - Release Notes:
+    - Version History: release-notes/version-history.md
+    - Roadmap: release-notes/roadmap.md
+
+copyright:  © 2025 Legion

@@ -15,30 +15,86 @@ Welcome! We're excited you're interested in contributing to Legion. This documen
    - Add upstream remote: `git remote add upstream https://github.com/LLMP-io/Legion.git`
 
 2. **Set Up Development Environment**
-   ```bash
-   # Run the setup script
-   python3 scripts/setup_env.py
+   Three options here.
+   - **Option 1**: Using `Makefile`
+      Optioned and automated
+      - Requires you have `make` and `poetry` installed
+      - `ENV` management options are currently `venv` or `conda`
+      - `POETRY` can be set to `true` or `false` to use it, or `pip`
 
-   # Activate the virtual environment
-   # On macOS/Linux:
-   source venv/bin/activate
-   # On Windows:
-   # venv\Scripts\activate
+      2a. [Install Make](https://www.gnu.org/software/make/manual/make.html)
+
+      2b. Install Poetry
+      ```bash
+      curl -sSL https://install.python-poetry.org | python3 -
+      ```
+
+      2c. Set up the environment
+
+      ```bash
+      make setup ENV=venv POETRY=false
+      # or
+      make setup ENV=conda POETRY=true
+      # or
+      make  # Just use the defaults
+      ```
+      This will:
+      - Create and activate a virtual environment (with specified `ENV`)
+      - Install all dependencies (with `pip` or `poetry`)
+      - Set up pre-commit hooks
+
+      You can also:
+      ```bash
+      make lint POETRY=<true|false>
+      or
+      make test POETRY=<true|false>
+      ```
+
+   - **Option 2**: Using `setup.py`
+      Default and standard `venv`/`pip` setup
+      ```bash
+      # Run the setup script
+      python3 scripts/setup_env.py
+
+      # Activate the virtual environment
+      # On macOS/Linux:
+      source venv/bin/activate
+      # On Windows:
+      # venv\Scripts\activate
+      ```
+      This will:
+      - Create and activate a virtual environment
+      - Install all dependencies
+      - Set up pre-commit hooks
+
+   - **Option 3**: 🐳 Whale you can just use `Docker`
+      If you have Docker installed and the docker engine running, from the
+      project root you can just run:
+      ```bash
+      docker compose up --build
+      ```
+      This will spin up a cointainer, build the project to it, and run the tests.
+      Want to keep it running and get a shell on it to run other commands?
+      ```bash
+      docker compose up -d  # detached
+      docker compose exec legion bash
+      ```
+
+3. **Configure Git Email**
+   To maintain privacy while contributing, you can use a GitHub-provided no-reply email address:
+   ```bash
+   # Replace 'username' with your GitHub username
+   # Get your GitHub user ID from: https://api.github.com/users/username
+   git config user.email "ID+username@users.noreply.github.com"
    ```
 
-   This will:
-   - Create a virtual environment
-   - Install all dependencies
-   - Set up pre-commit hooks
-
-   Note: Make sure you have Python 3.8+ installed before running the setup script.
-
-3. **Create a Branch**
+4. **Create a Branch**
    ```bash
    git checkout -b feature/your-feature-name
    # or
    git checkout -b fix/your-bug-fix
    ```
+
 
 ## Development Guidelines
 
@@ -135,6 +191,31 @@ python scripts/security.py legion/agents legion/blocks
    - Maintainers will review your PR
    - Address any requested changes
    - Once approved, maintainers will merge your PR
+
+### **Collaboration Patterns**
+
+1. **Direct to Upstream** (Recommended)
+   - Each contributor maintains their fork
+   - Create PRs directly to upstream
+   - Sync fork:
+     ```bash
+     git fetch upstream
+     git rebase upstream/main
+     ```
+
+2. **Fork Collaboration**
+   - Add collaborators to your fork's settings
+   - Both can push branches
+   - Create single PR to upstream
+   - Maintain clear ownership of the PR
+
+3. **Cross-fork PRs**
+   - For non-collaborator contributions
+   - Create PR between forks
+   - Owner submits final PR upstream
+
+Note: Contributions are tracked through PRs, not individual commits due to squash merging. All contributors are credited in the PR history.
+
 
 ## Issue Guidelines
 

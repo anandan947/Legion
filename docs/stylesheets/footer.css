@@ -1,0 +1,45 @@
+/* Footer customization */
+.md-footer {
+    background-color: var(--md-primary-fg-color);
+}
+
+.md-footer-meta {
+    background-color: var(--md-primary-fg-color);
+}
+
+/* Make footer slimmer */
+.md-footer-meta__inner {
+    padding: 0.4rem 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Custom copyright text */
+.md-footer-copyright {
+    display: block !important;
+    font-size: 0.60rem;
+    margin: 0;
+    padding: 0;
+    color: var(--md-footer-fg-color--light);
+}
+
+.md-footer-social {
+    padding: 0;
+    margin: 0;
+}
+
+.md-footer-social__link {
+    padding: 0.4rem;
+}
+
+/* Adjust icon sizes */
+.md-footer-social__link svg {
+    width: 1.2rem;
+    height: 1.2rem;
+}
+
+/* Footer links hover effect */
+.md-footer-social__link:hover {
+    color: var(--md-accent-fg-color);
+}
